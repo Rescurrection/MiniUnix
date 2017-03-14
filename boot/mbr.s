@@ -101,7 +101,7 @@ rd_disk_m_16:
 	cmp al,0x08
 	jnz .not_ready		;未准备好，继续等
 
-;第五步：从0x1f0端口读数据
+；;第五步：从0x1f0端口读数据
 	mov ax,di
 	mov dx,256
 	mul dx
