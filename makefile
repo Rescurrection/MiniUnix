@@ -57,7 +57,18 @@ $(BUILD_DIR)/thread.o: thread/thread.c thread/thread.h lib/stdint.h \
 $(BUILD_DIR)/list.o: lib/kernel/list.c lib/kernel/list.h kernel/global.h lib/stdint.h \
         kernel/interrupt.h
 	$(CC) $(CFLAGS) $< -o $@
+	
+$(BUILD_DIR)/tss.o: userprog/tss.c userprog/tss.h thread/thread.h lib/stdint.h \
+    	lib/kernel/list.h kernel/global.h lib/string.h lib/stdint.h \
+     	lib/kernel/print.h
+	$(CC) $(CFLAGS) $< -o $@
 
+$(BUILD_DIR)/process.o: userprog/process.c userprog/process.h thread/thread.h \
+    	lib/stdint.h lib/kernel/list.h kernel/global.h kernel/debug.h \
+     	kernel/memory.h lib/kernel/bitmap.h userprog/tss.h kernel/interrupt.h \
+      	lib/string.h lib/stdint.h
+	$(CC) $(CFLAGS) $< -o $@
+	
 ##############    汇编代码编译    ###############
 $(BUILD_DIR)/kernel.o: kernel/kernel.S
 	$(AS) $(ASFLAGS) $< -o $@
