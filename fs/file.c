@@ -50,3 +50,24 @@ int32_t pcb_fd_install(int32_t globa_fd_idx) {
    }
    return local_fd_idx;
 }
+
+/* 分配一个i结点,返回i结点号 */
+int32_t inode_bitmap_alloc(struct partition* part) {
+   int32_t bit_idx = bitmap_scan(&part->inode_bitmap, 1);
+   if (bit_idx == -1) {
+      return -1;
+   }
+   bitmap_set(&part->inode_bitmap, bit_idx, 1);
+   return bit_idx;
+}
+
+/* 分配1个扇区,返回其扇区地址 */
+int32_t block_bitmap_alloc(struct partition* part) {
+   int32_t bit_idx = bitmap_scan(&part->block_bitmap, 1);
+   if (bit_idx == -1) {
+      return -1;
+   }
+   bitmap_set(&part->block_bitmap, bit_idx, 1);
+   /* 和inode_bitmap_malloc不同,此处返回的不是位图索引,而是具体可用的扇区地址 */
+   return (part->sb->data_start_lba + bit_idx);
+} 
