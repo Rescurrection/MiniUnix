@@ -93,3 +93,21 @@ void bitmap_sync(struct partition* part, uint32_t bit_idx, uint8_t btmp_type) {
    }
    ide_write(part->my_disk, sec_lba, bitmap_off, 1);
 }
+
+/* 创建文件,若成功则返回文件描述符,否则返回-1 */
+int32_t file_create(struct dir* parent_dir, char* filename, uint8_t flag) {
+   /* 后续操作的公共缓冲区 */
+   void* io_buf = sys_malloc(1024);
+   if (io_buf == NULL) {
+      printk("in file_creat: sys_malloc for io_buf failed\n");
+      return -1;
+   }
+
+   uint8_t rollback_step = 0;	       // 用于操作失败时回滚各资源状态
+
+   /* 为新文件分配inode */
+   int32_t inode_no = inode_bitmap_alloc(cur_part); 
+   if (inode_no == -1) {
+      printk("in file_creat: allocate inode failed\n");
+      return -1;
+   }
