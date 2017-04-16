@@ -71,3 +71,25 @@ int32_t block_bitmap_alloc(struct partition* part) {
    /* 和inode_bitmap_malloc不同,此处返回的不是位图索引,而是具体可用的扇区地址 */
    return (part->sb->data_start_lba + bit_idx);
 } 
+
+/* 将内存中bitmap第bit_idx位所在的512字节同步到硬盘 */
+void bitmap_sync(struct partition* part, uint32_t bit_idx, uint8_t btmp_type) {
+   uint32_t off_sec = bit_idx / 4096;  // 本i结点索引相对于位图的扇区偏移量
+   uint32_t off_size = off_sec * BLOCK_SIZE;  // 本i结点索引相对于位图的字节偏移量
+   uint32_t sec_lba;
+   uint8_t* bitmap_off;
+
+/* 需要被同步到硬盘的位图只有inode_bitmap和block_bitmap */
+   switch (btmp_type) {
+      case INODE_BITMAP:
+	 sec_lba = part->sb->inode_bitmap_lba + off_sec;
+	 bitmap_off = part->inode_bitmap.bits + off_size;
+	 break;
+
+      case BLOCK_BITMAP: 
+	 sec_lba = part->sb->block_bitmap_lba + off_sec;
+	 bitmap_off = part->block_bitmap.bits + off_size;
+	 break;
+   }
+   ide_write(part->my_disk, sec_lba, bitmap_off, 1);
+}
