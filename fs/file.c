@@ -111,3 +111,30 @@ int32_t file_create(struct dir* parent_dir, char* filename, uint8_t flag) {
       printk("in file_creat: allocate inode failed\n");
       return -1;
    }
+/* 此inode要从堆中申请内存,不可生成局部变量(函数退出时会释放)
+ * 因为file_table数组中的文件描述符的inode指针要指向它.*/
+   struct inode* new_file_inode = (struct inode*)sys_malloc(sizeof(struct inode)); 
+   if (new_file_inode == NULL) {
+      printk("file_create: sys_malloc for inode failded\n");
+      rollback_step = 1;
+      goto rollback;
+   }
+   inode_init(inode_no, new_file_inode);	    // 初始化i结点
+
+   /* 返回的是file_table数组的下标 */
+   int fd_idx = get_free_slot_in_global();
+   if (fd_idx == -1) {
+      printk("exceed max open files\n");
+      rollback_step = 2;
+      goto rollback;
+   }
+
+   file_table[fd_idx].fd_inode = new_file_inode;
+   file_table[fd_idx].fd_pos = 0;
+   file_table[fd_idx].fd_flag = flag;
+   file_table[fd_idx].fd_inode->write_deny = false;
+
+   struct dir_entry new_dir_entry;
+   memset(&new_dir_entry, 0, sizeof(struct dir_entry));
+
+   create_dir_entry(filename, inode_no, FT_REGULAR, &new_dir_entry);	// create_dir_entry只是内存操作不出意外,不会返回失败
