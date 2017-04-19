@@ -114,3 +114,82 @@ static void partition_format(struct partition* part) {
    printk("   magic:0x%x\n   part_lba_base:0x%x\n   all_sectors:0x%x\n   inode_cnt:0x%x\n   block_bitmap_lba:0x%x\n   block_bitmap_sectors:0x%x\n   inode_bitmap_lba:0x%x\n   inode_bitmap_sectors:0x%x\n   inode_table_lba:0x%x\n   inode_table_sectors:0x%x\n   data_start_lba:0x%x\n", sb.magic, sb.part_lba_base, sb.sec_cnt, sb.inode_cnt, sb.block_bitmap_lba, sb.block_bitmap_sects, sb.inode_bitmap_lba, sb.inode_bitmap_sects, sb.inode_table_lba, sb.inode_table_sects, sb.data_start_lba);
 
    struct disk* hd = part->my_disk;
+	
+/*******************************
+ * 1 将超级块写入本分区的1扇区 *
+ ******************************/
+   ide_write(hd, part->start_lba + 1, &sb, 1);
+   printk("   super_block_lba:0x%x\n", part->start_lba + 1);
+
+/* 找出数据量最大的元信息,用其尺寸做存储缓冲区*/
+   uint32_t buf_size = (sb.block_bitmap_sects >= sb.inode_bitmap_sects ? sb.block_bitmap_sects : sb.inode_bitmap_sects);
+   buf_size = (buf_size >= sb.inode_table_sects ? buf_size : sb.inode_table_sects) * SECTOR_SIZE;
+   uint8_t* buf = (uint8_t*)sys_malloc(buf_size);	// 申请的内存由内存管理系统清0后返回
+   
+/**************************************
+ * 2 将块位图初始化并写入sb.block_bitmap_lba *
+ *************************************/
+   /* 初始化块位图block_bitmap */
+   buf[0] |= 0x01;       // 第0个块预留给根目录,位图中先占位
+   uint32_t block_bitmap_last_byte = block_bitmap_bit_len / 8;
+   uint8_t  block_bitmap_last_bit  = block_bitmap_bit_len % 8;
+   uint32_t last_size = SECTOR_SIZE - (block_bitmap_last_byte % SECTOR_SIZE);	     // last_size是位图所在最后一个扇区中，不足一扇区的其余部分
+
+   /* 1 先将位图最后一字节到其所在的扇区的结束全置为1,即超出实际块数的部分直接置为已占用*/
+   memset(&buf[block_bitmap_last_byte], 0xff, last_size);
+   
+   /* 2 再将上一步中覆盖的最后一字节内的有效位重新置0 */
+   uint8_t bit_idx = 0;
+   while (bit_idx <= block_bitmap_last_bit) {
+      buf[block_bitmap_last_byte] &= ~(1 << bit_idx++);
+   }
+   ide_write(hd, sb.block_bitmap_lba, buf, sb.block_bitmap_sects);
+
+/***************************************
+ * 3 将inode位图初始化并写入sb.inode_bitmap_lba *
+ ***************************************/
+   /* 先清空缓冲区*/
+   memset(buf, 0, buf_size);
+   buf[0] |= 0x1;      // 第0个inode分给了根目录
+   /* 由于inode_table中共4096个inode,位图inode_bitmap正好占用1扇区,
+    * 即inode_bitmap_sects等于1, 所以位图中的位全都代表inode_table中的inode,
+    * 无须再像block_bitmap那样单独处理最后一扇区的剩余部分,
+    * inode_bitmap所在的扇区中没有多余的无效位 */
+   ide_write(hd, sb.inode_bitmap_lba, buf, sb.inode_bitmap_sects);
+
+/***************************************
+ * 4 将inode数组初始化并写入sb.inode_table_lba *
+ ***************************************/
+ /* 准备写inode_table中的第0项,即根目录所在的inode */
+   memset(buf, 0, buf_size);  // 先清空缓冲区buf
+   struct inode* i = (struct inode*)buf; 
+   i->i_size = sb.dir_entry_size * 2;	 // .和..
+   i->i_no = 0;   // 根目录占inode数组中第0个inode
+   i->i_sectors[0] = sb.data_start_lba;	     // 由于上面的memset,i_sectors数组的其它元素都初始化为0 
+   ide_write(hd, sb.inode_table_lba, buf, sb.inode_table_sects);
+   
+/***************************************
+ * 5 将根目录初始化并写入sb.data_start_lba
+ ***************************************/
+   /* 写入根目录的两个目录项.和.. */
+   memset(buf, 0, buf_size);
+   struct dir_entry* p_de = (struct dir_entry*)buf;
+
+   /* 初始化当前目录"." */
+   memcpy(p_de->filename, ".", 1);
+   p_de->i_no = 0;
+   p_de->f_type = FT_DIRECTORY;
+   p_de++;
+
+   /* 初始化当前目录父目录".." */
+   memcpy(p_de->filename, "..", 2);
+   p_de->i_no = 0;   // 根目录的父目录依然是根目录自己
+   p_de->f_type = FT_DIRECTORY;
+
+   /* sb.data_start_lba已经分配给了根目录,里面是根目录的目录项 */
+   ide_write(hd, sb.data_start_lba, buf, 1);
+
+   printk("   root_dir_lba:0x%x\n", sb.data_start_lba);
+   printk("%s format done\n", part->name);
+   sys_free(buf);
+}
