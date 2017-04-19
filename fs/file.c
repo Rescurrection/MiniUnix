@@ -138,3 +138,74 @@ int32_t file_create(struct dir* parent_dir, char* filename, uint8_t flag) {
    memset(&new_dir_entry, 0, sizeof(struct dir_entry));
 
    create_dir_entry(filename, inode_no, FT_REGULAR, &new_dir_entry);	// create_dir_entry只是内存操作不出意外,不会返回失败
+
+/* 同步内存数据到硬盘 */
+   /* a 在目录parent_dir下安装目录项new_dir_entry, 写入硬盘后返回true,否则false */
+   if (!sync_dir_entry(parent_dir, &new_dir_entry, io_buf)) {
+      printk("sync dir_entry to disk failed\n");
+      rollback_step = 3;
+      goto rollback;
+   }
+
+   memset(io_buf, 0, 1024);
+   /* b 将父目录i结点的内容同步到硬盘 */
+   inode_sync(cur_part, parent_dir->inode, io_buf);
+
+   memset(io_buf, 0, 1024);
+   /* c 将新创建文件的i结点内容同步到硬盘 */
+   inode_sync(cur_part, new_file_inode, io_buf);
+
+   /* d 将inode_bitmap位图同步到硬盘 */
+   bitmap_sync(cur_part, inode_no, INODE_BITMAP);
+
+   /* e 将创建的文件i结点添加到open_inodes链表 */
+   list_push(&cur_part->open_inodes, &new_file_inode->inode_tag);
+   new_file_inode->i_open_cnts = 1;
+
+   sys_free(io_buf);
+   return pcb_fd_install(fd_idx);
+
+/*创建文件需要创建相关的多个资源,若某步失败则会执行到下面的回滚步骤 */
+rollback:
+   switch (rollback_step) {
+      case 3:
+	 /* 失败时,将file_table中的相应位清空 */
+	 memset(&file_table[fd_idx], 0, sizeof(struct file)); 
+      case 2:
+	 sys_free(new_file_inode);
+      case 1:
+	 /* 如果新文件的i结点创建失败,之前位图中分配的inode_no也要恢复 */
+	 bitmap_set(&cur_part->inode_bitmap, inode_no, 0);
+	 break;
+   }
+   sys_free(io_buf);
+   return -1;
+}
+
+/* 打开编号为inode_no的inode对应的文件,若成功则返回文件描述符,否则返回-1 */
+int32_t file_open(uint32_t inode_no, uint8_t flag) {
+   int fd_idx = get_free_slot_in_global();
+   if (fd_idx == -1) {
+      printk("exceed max open files\n");
+      return -1;
+   }
+   file_table[fd_idx].fd_inode = inode_open(cur_part, inode_no);
+   file_table[fd_idx].fd_pos = 0;	     // 每次打开文件,要将fd_pos还原为0,即让文件内的指针指向开头
+   file_table[fd_idx].fd_flag = flag;
+   bool* write_deny = &file_table[fd_idx].fd_inode->write_deny; 
+
+   if (flag == O_WRONLY || flag == O_RDWR) {	// 只要是关于写文件,判断是否有其它进程正写此文件
+						// 若是读文件,不考虑write_deny
+   /* 以下进入临界区前先关中断 */
+      enum intr_status old_status = intr_disable();
+      if (!(*write_deny)) {    // 若当前没有其它进程写该文件,将其占用.
+	 *write_deny = true;   // 置为true,避免多个进程同时写此文件
+	 intr_set_status(old_status);	  // 恢复中断
+      } else {		// 直接失败返回
+	 intr_set_status(old_status);
+	 printk("file can`t be write now, try again later\n");
+	 return -1;
+      }
+   }  // 若是读文件或创建文件,不用理会write_deny,保持默认
+   return pcb_fd_install(fd_idx);
+}
