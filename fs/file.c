@@ -220,3 +220,33 @@ int32_t file_close(struct file* file) {
    file->fd_inode = NULL;   // 使文件结构可用
    return 0;
 }
+
+/* 把buf中的count个字节写入file,成功则返回写入的字节数,失败则返回-1 */
+int32_t file_write(struct file* file, const void* buf, uint32_t count) {
+   if ((file->fd_inode->i_size + count) > (BLOCK_SIZE * 140))	{   // 文件目前最大只支持512*140=71680字节
+      printk("exceed max file_size 71680 bytes, write file failed\n");
+      return -1;
+   }
+   uint8_t* io_buf = sys_malloc(BLOCK_SIZE);
+   if (io_buf == NULL) {
+      printk("file_write: sys_malloc for io_buf failed\n");
+      return -1;
+   }
+   uint32_t* all_blocks = (uint32_t*)sys_malloc(BLOCK_SIZE + 48);	  // 用来记录文件所有的块地址
+   if (all_blocks == NULL) {
+      printk("file_write: sys_malloc for all_blocks failed\n");
+      return -1;
+   }
+
+   const uint8_t* src = buf;        // 用src指向buf中待写入的数据 
+   uint32_t bytes_written = 0;	    // 用来记录已写入数据大小
+   uint32_t size_left = count;	    // 用来记录未写入数据大小
+   int32_t block_lba = -1;	    // 块地址
+   uint32_t block_bitmap_idx = 0;   // 用来记录block对应于block_bitmap中的索引,做为参数传给bitmap_sync
+   uint32_t sec_idx;	      // 用来索引扇区
+   uint32_t sec_lba;	      // 扇区地址
+   uint32_t sec_off_bytes;    // 扇区内字节偏移量
+   uint32_t sec_left_bytes;   // 扇区内剩余字节量
+   uint32_t chunk_size;	      // 每次写入硬盘的数据块大小
+   int32_t indirect_block_table;      // 用来获取一级间接表地址
+   uint32_t block_idx;		      // 块索引
