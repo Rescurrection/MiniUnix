@@ -250,3 +250,18 @@ int32_t file_write(struct file* file, const void* buf, uint32_t count) {
    uint32_t chunk_size;	      // 每次写入硬盘的数据块大小
    int32_t indirect_block_table;      // 用来获取一级间接表地址
    uint32_t block_idx;		      // 块索引
+
+/* 判断文件是否是第一次写,如果是,先为其分配一个块 */
+   if (file->fd_inode->i_sectors[0] == 0) {
+      block_lba = block_bitmap_alloc(cur_part);
+      if (block_lba == -1) {
+	 printk("file_write: block_bitmap_alloc failed\n");
+	 return -1;
+      }
+      file->fd_inode->i_sectors[0] = block_lba;
+
+      /* 每分配一个块就将位图同步到硬盘 */
+      block_bitmap_idx = block_lba - cur_part->sb->data_start_lba;
+      ASSERT(block_bitmap_idx != 0);
+      bitmap_sync(cur_part, block_bitmap_idx, BLOCK_BITMAP);
+   }
