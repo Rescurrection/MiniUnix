@@ -230,3 +230,20 @@ int32_t path_depth_cnt(char* pathname) {
    }
    return depth;
 }
+
+/* 搜索文件pathname,若找到则返回其inode号,否则返回-1 */
+static int search_file(const char* pathname, struct path_search_record* searched_record) {
+   /* 如果待查找的是根目录,为避免下面无用的查找,直接返回已知根目录信息 */
+   if (!strcmp(pathname, "/") || !strcmp(pathname, "/.") || !strcmp(pathname, "/..")) {
+      searched_record->parent_dir = &root_dir;
+      searched_record->file_type = FT_DIRECTORY;
+      searched_record->searched_path[0] = 0;	   // 搜索路径置空
+      return 0;
+   }
+
+   uint32_t path_len = strlen(pathname);
+   /* 保证pathname至少是这样的路径/x且小于最大长度 */
+   ASSERT(pathname[0] == '/' && path_len > 1 && path_len < MAX_PATH_LEN);
+   char* sub_path = (char*)pathname;
+   struct dir* parent_dir = &root_dir;	
+   struct dir_entry dir_e;
