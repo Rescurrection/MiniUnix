@@ -265,3 +265,12 @@ int32_t file_write(struct file* file, const void* buf, uint32_t count) {
       ASSERT(block_bitmap_idx != 0);
       bitmap_sync(cur_part, block_bitmap_idx, BLOCK_BITMAP);
    }
+/* 写入count个字节前,该文件已经占用的块数 */
+    uint32_t file_has_used_blocks = file->fd_inode->i_size / BLOCK_SIZE + 1;
+
+/* 存储count字节后该文件将占用的块数 */
+    uint32_t file_will_use_blocks = (file->fd_inode->i_size + count) / BLOCK_SIZE + 1;
+    ASSERT(file_will_use_blocks <= 140);
+
+/* 通过此增量判断是否需要分配扇区,如增量为0,表示原扇区够用 */
+   uint32_t add_blocks = file_will_use_blocks - file_has_used_blocks;
