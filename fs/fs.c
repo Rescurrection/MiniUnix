@@ -288,3 +288,12 @@ static int search_file(const char* pathname, struct path_search_record* searched
 	  * 若是创建新文件的话需要在parent_dir中创建 */
 	 return -1;
       }
+}
+   /* 执行到此,必然是遍历了完整路径并且查找的文件或目录只有同名目录存在 */
+   dir_close(searched_record->parent_dir);	      
+
+   /* 保存被查找目录的直接父目录 */
+   searched_record->parent_dir = dir_open(cur_part, parent_inode_no);	   
+   searched_record->file_type = FT_DIRECTORY;
+   return dir_e.i_no;
+}
