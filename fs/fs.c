@@ -325,3 +325,41 @@ int32_t sys_open(const char* pathname, uint8_t flags) {
    }
 
    uint32_t path_searched_depth = path_depth_cnt(searched_record.searched_path);
+
+   /* 先判断是否把pathname的各层目录都访问到了,即是否在某个中间目录就失败了 */
+   if (pathname_depth != path_searched_depth) {   // 说明并没有访问到全部的路径,某个中间目录是不存在的
+      printk("cannot access %s: Not a directory, subpath %s is`t exist\n", \
+	    pathname, searched_record.searched_path);
+      dir_close(searched_record.parent_dir);
+      return -1;
+   }
+
+   /* 若是在最后一个路径上没找到,并且并不是要创建文件,直接返回-1 */
+   if (!found && !(flags & O_CREAT)) {
+      printk("in path %s, file %s is`t exist\n", \
+	    searched_record.searched_path, \
+	    (strrchr(searched_record.searched_path, '/') + 1));
+      dir_close(searched_record.parent_dir);
+      return -1;
+   } else if (found && flags & O_CREAT) {  // 若要创建的文件已存在
+      printk("%s has already exist!\n", pathname);
+      dir_close(searched_record.parent_dir);
+      return -1;
+   }
+
+   switch (flags & O_CREAT) {
+      case O_CREAT:
+	 printk("creating file\n");
+	 fd = file_create(searched_record.parent_dir, (strrchr(pathname, '/') + 1), flags);
+	 dir_close(searched_record.parent_dir);
+	 break;
+      default:
+   /* 其余情况均为打开已存在文件:
+    * O_RDONLY,O_WRONLY,O_RDWR */
+	 fd = file_open(inode_no, flags);
+   }
+
+   /* 此fd是指任务pcb->fd_table数组中的元素下标,
+    * 并不是指全局file_table中的下标 */
+   return fd;
+}
