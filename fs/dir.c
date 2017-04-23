@@ -102,3 +102,13 @@ void dir_close(struct dir* dir) {
    inode_close(dir->inode);
    sys_free(dir);
 }
+
+/* 在内存中初始化目录项p_de */
+void create_dir_entry(char* filename, uint32_t inode_no, uint8_t file_type, struct dir_entry* p_de) {
+   ASSERT(strlen(filename) <=  MAX_FILE_NAME_LEN);
+
+   /* 初始化目录项 */
+   memcpy(p_de->filename, filename, strlen(filename));
+   p_de->i_no = inode_no;
+   p_de->f_type = file_type;
+}
