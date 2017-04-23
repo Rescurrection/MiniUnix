@@ -50,3 +50,42 @@ bool search_dir_entry(struct partition* part, struct dir* pdir, \
    if (pdir->inode->i_sectors[12] != 0) {	// 若含有一级间接块表
       ide_read(part->my_disk, pdir->inode->i_sectors[12], all_blocks + 12, 1);
    }
+/* 至此,all_blocks存储的是该文件或目录的所有扇区地址 */
+
+   /* 写目录项的时候已保证目录项不跨扇区,
+    * 这样读目录项时容易处理, 只申请容纳1个扇区的内存 */
+   uint8_t* buf = (uint8_t*)sys_malloc(SECTOR_SIZE);
+   struct dir_entry* p_de = (struct dir_entry*)buf;	    // p_de为指向目录项的指针,值为buf起始地址
+   uint32_t dir_entry_size = part->sb->dir_entry_size;
+   uint32_t dir_entry_cnt = SECTOR_SIZE / dir_entry_size;   // 1扇区内可容纳的目录项个数
+
+   /* 开始在所有块中查找目录项 */
+   while (block_idx < block_cnt) {		  
+   /* 块地址为0时表示该块中无数据,继续在其它块中找 */
+      if (all_blocks[block_idx] == 0) {
+	 block_idx++;
+	 continue;
+      }
+      ide_read(part->my_disk, all_blocks[block_idx], buf, 1);
+
+      uint32_t dir_entry_idx = 0;
+      /* 遍历扇区中所有目录项 */
+      while (dir_entry_idx < dir_entry_cnt) {
+	 /* 若找到了,就直接复制整个目录项 */
+	 if (!strcmp(p_de->filename, name)) {
+	    memcpy(dir_e, p_de, dir_entry_size);
+	    sys_free(buf);
+	    sys_free(all_blocks);
+	    return true;
+	 }
+	 dir_entry_idx++;
+	 p_de++;
+      }
+      block_idx++;
+      p_de = (struct dir_entry*)buf;  // 此时p_de已经指向扇区内最后一个完整目录项了,需要恢复p_de指向为buf
+      memset(buf, 0, SECTOR_SIZE);	  // 将buf清0,下次再用
+   }
+   sys_free(buf);
+   sys_free(all_blocks);
+   return false;
+}
