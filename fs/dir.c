@@ -89,3 +89,16 @@ bool search_dir_entry(struct partition* part, struct dir* pdir, \
    sys_free(all_blocks);
    return false;
 }
+
+/* 关闭目录 */
+void dir_close(struct dir* dir) {
+/*************      根目录不能关闭     ***************
+ *1 根目录自打开后就不应该关闭,否则还需要再次open_root_dir();
+ *2 root_dir所在的内存是低端1M之内,并非在堆中,free会出问题 */
+   if (dir == &root_dir) {
+   /* 不做任何处理直接返回*/
+      return;
+   }
+   inode_close(dir->inode);
+   sys_free(dir);
+}
