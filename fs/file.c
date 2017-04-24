@@ -380,3 +380,33 @@ int32_t file_write(struct file* file, const void* buf, uint32_t count) {
 	 ide_write(cur_part->my_disk, indirect_block_table, all_blocks + 12, 1);   // 同步一级间接块表到硬盘
       } 
    }
+  /* 用到的块地址已经收集到all_blocks中,下面开始写数据 */
+   bool first_write_block = true;      // 含有剩余空间的扇区标识
+   file->fd_pos = file->fd_inode->i_size - 1;   // 置fd_pos为文件大小-1,下面在写数据时随时更新
+   while (bytes_written < count) {      // 直到写完所有数据
+      memset(io_buf, 0, BLOCK_SIZE);
+      sec_idx = file->fd_inode->i_size / BLOCK_SIZE;
+      sec_lba = all_blocks[sec_idx];
+      sec_off_bytes = file->fd_inode->i_size % BLOCK_SIZE;
+      sec_left_bytes = BLOCK_SIZE - sec_off_bytes;
+
+      /* 判断此次写入硬盘的数据大小 */
+      chunk_size = size_left < sec_left_bytes ? size_left : sec_left_bytes;
+      if (first_write_block) {
+	 ide_read(cur_part->my_disk, sec_lba, io_buf, 1);
+	 first_write_block = false;
+      }
+      memcpy(io_buf + sec_off_bytes, src, chunk_size);
+      ide_write(cur_part->my_disk, sec_lba, io_buf, 1);
+
+      src += chunk_size;   // 将指针推移到下个新数据
+      file->fd_inode->i_size += chunk_size;  // 更新文件大小
+      file->fd_pos += chunk_size;   
+      bytes_written += chunk_size;
+      size_left -= chunk_size;
+   }
+   inode_sync(cur_part, file->fd_inode, io_buf);
+   sys_free(all_blocks);
+   sys_free(io_buf);
+   return bytes_written;
+}
