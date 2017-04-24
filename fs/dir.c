@@ -112,3 +112,27 @@ void create_dir_entry(char* filename, uint32_t inode_no, uint8_t file_type, stru
    p_de->i_no = inode_no;
    p_de->f_type = file_type;
 }
+
+/* 将目录项p_de写入父目录parent_dir中,io_buf由主调函数提供 */
+bool sync_dir_entry(struct dir* parent_dir, struct dir_entry* p_de, void* io_buf) {
+   struct inode* dir_inode = parent_dir->inode;
+   uint32_t dir_size = dir_inode->i_size;
+   uint32_t dir_entry_size = cur_part->sb->dir_entry_size;
+
+   ASSERT(dir_size % dir_entry_size == 0);	 // dir_size应该是dir_entry_size的整数倍
+
+   uint32_t dir_entrys_per_sec = (512 / dir_entry_size);       // 每扇区最大的目录项数目
+   int32_t block_lba = -1;
+
+   /* 将该目录的所有扇区地址(12个直接块+ 128个间接块)存入all_blocks */
+   uint8_t block_idx = 0;
+   uint32_t all_blocks[140] = {0};	  // all_blocks保存目录所有的块
+
+   /* 将12个直接块存入all_blocks */
+   while (block_idx < 12) {
+      all_blocks[block_idx] = dir_inode->i_sectors[block_idx];
+      block_idx++;
+   }
+
+   struct dir_entry* dir_e = (struct dir_entry*)io_buf;	       // dir_e用来在io_buf中遍历目录项
+   int32_t block_bitmap_idx = -1;
