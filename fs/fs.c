@@ -363,3 +363,31 @@ int32_t sys_open(const char* pathname, uint8_t flags) {
     * 并不是指全局file_table中的下标 */
    return fd;
 }
+
+/* 将文件描述符转化为文件表的下标 */
+uint32_t fd_local2global(uint32_t local_fd) {
+   struct task_struct* cur = running_thread();
+   int32_t global_fd = cur->fd_table[local_fd];  
+   ASSERT(global_fd >= 0 && global_fd < MAX_FILE_OPEN);
+   return (uint32_t)global_fd;
+} 
+
+/* 关闭文件描述符fd指向的文件,成功返回0,否则返回-1 */
+int32_t sys_close(int32_t fd) {
+   int32_t ret = -1;   // 返回值默认为-1,即失败
+   if (fd > 2) {
+      uint32_t global_fd = fd_local2global(fd);
+      if (is_pipe(fd)) {
+	 /* 如果此管道上的描述符都被关闭,释放管道的环形缓冲区 */
+	 if (--file_table[global_fd].fd_pos == 0) {
+	    mfree_page(PF_KERNEL, file_table[global_fd].fd_inode, 1);
+	    file_table[global_fd].fd_inode = NULL;
+	 }
+	 ret = 0;
+      } else {
+	 ret = file_close(&file_table[global_fd]);
+      }
+      running_thread()->fd_table[fd] = -1; // 使该文件描述符位可用
+   }
+   return ret;
+}
