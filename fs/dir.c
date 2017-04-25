@@ -190,3 +190,22 @@ bool sync_dir_entry(struct dir* parent_dir, struct dir_entry* p_de, void* io_buf
 	 dir_inode->i_size += dir_entry_size;
 	 return true;
       }
+	/* 若第block_idx块已存在,将其读进内存,然后在该块中查找空目录项 */
+      ide_read(cur_part->my_disk, all_blocks[block_idx], io_buf, 1); 
+      /* 在扇区内查找空目录项 */
+      uint8_t dir_entry_idx = 0;
+      while (dir_entry_idx < dir_entrys_per_sec) {
+	 if ((dir_e + dir_entry_idx)->f_type == FT_UNKNOWN) {	// FT_UNKNOWN为0,无论是初始化或是删除文件后,都会将f_type置为FT_UNKNOWN.
+	    memcpy(dir_e + dir_entry_idx, p_de, dir_entry_size);    
+	    ide_write(cur_part->my_disk, all_blocks[block_idx], io_buf, 1);
+
+	    dir_inode->i_size += dir_entry_size;
+	    return true;
+	 }
+	 dir_entry_idx++;
+      }
+      block_idx++;
+   }   
+   printk("directory is full!\n");
+   return false;
+}
