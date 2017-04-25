@@ -410,3 +410,35 @@ int32_t file_write(struct file* file, const void* buf, uint32_t count) {
    sys_free(io_buf);
    return bytes_written;
 }
+
+/* 从文件file中读取count个字节写入buf, 返回读出的字节数,若到文件尾则返回-1 */
+int32_t file_read(struct file* file, void* buf, uint32_t count) {
+   uint8_t* buf_dst = (uint8_t*)buf;
+   uint32_t size = count, size_left = size;
+
+   /* 若要读取的字节数超过了文件可读的剩余量, 就用剩余量做为待读取的字节数 */
+   if ((file->fd_pos + count) > file->fd_inode->i_size)	{
+      size = file->fd_inode->i_size - file->fd_pos;
+      size_left = size;
+      if (size == 0) {	   // 若到文件尾则返回-1
+	 return -1;
+      }
+   }
+
+   uint8_t* io_buf = sys_malloc(BLOCK_SIZE);
+   if (io_buf == NULL) {
+      printk("file_read: sys_malloc for io_buf failed\n");
+   }
+   uint32_t* all_blocks = (uint32_t*)sys_malloc(BLOCK_SIZE + 48);	  // 用来记录文件所有的块地址
+   if (all_blocks == NULL) {
+      printk("file_read: sys_malloc for all_blocks failed\n");
+      return -1;
+   }
+
+   uint32_t block_read_start_idx = file->fd_pos / BLOCK_SIZE;		       // 数据所在块的起始地址
+   uint32_t block_read_end_idx = (file->fd_pos + size) / BLOCK_SIZE;	       // 数据所在块的终止地址
+   uint32_t read_blocks = block_read_start_idx - block_read_end_idx;	       // 如增量为0,表示数据在同一扇区
+   ASSERT(block_read_start_idx < 139 && block_read_end_idx < 139);
+
+   int32_t indirect_block_table;       // 用来获取一级间接表地址
+   uint32_t block_idx;		       // 获取待读的块地址 
