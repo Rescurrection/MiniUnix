@@ -481,3 +481,27 @@ int32_t file_read(struct file* file, void* buf, uint32_t count) {
 	 ide_read(cur_part->my_disk, indirect_block_table, all_blocks + 12, 1);	      // 将一级间接块表读进来写入到第13个块的位置之后
       } 
    }
+
+	 /* 用到的块地址已经收集到all_blocks中,下面开始读数据 */
+   uint32_t sec_idx, sec_lba, sec_off_bytes, sec_left_bytes, chunk_size;
+   uint32_t bytes_read = 0;
+   while (bytes_read < size) {	      // 直到读完为止
+      sec_idx = file->fd_pos / BLOCK_SIZE;
+      sec_lba = all_blocks[sec_idx];
+      sec_off_bytes = file->fd_pos % BLOCK_SIZE;
+      sec_left_bytes = BLOCK_SIZE - sec_off_bytes;
+      chunk_size = size_left < sec_left_bytes ? size_left : sec_left_bytes;	     // 待读入的数据大小
+
+      memset(io_buf, 0, BLOCK_SIZE);
+      ide_read(cur_part->my_disk, sec_lba, io_buf, 1);
+      memcpy(buf_dst, io_buf + sec_off_bytes, chunk_size);
+
+      buf_dst += chunk_size;
+      file->fd_pos += chunk_size;
+      bytes_read += chunk_size;
+      size_left -= chunk_size;
+   }
+   sys_free(all_blocks);
+   sys_free(io_buf);
+   return bytes_read;
+}
