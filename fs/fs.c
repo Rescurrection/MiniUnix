@@ -484,3 +484,23 @@ int32_t sys_lseek(int32_t fd, int32_t offset, uint8_t whence) {
    pf->fd_pos = new_pos;
    return pf->fd_pos;
 }
+
+/* 删除文件(非目录),成功返回0,失败返回-1 */
+int32_t sys_unlink(const char* pathname) {
+   ASSERT(strlen(pathname) < MAX_PATH_LEN);
+
+   /* 先检查待删除的文件是否存在 */
+   struct path_search_record searched_record;
+   memset(&searched_record, 0, sizeof(struct path_search_record));
+   int inode_no = search_file(pathname, &searched_record);
+   ASSERT(inode_no != 0);
+   if (inode_no == -1) {
+      printk("file %s not found!\n", pathname);
+      dir_close(searched_record.parent_dir);
+      return -1;
+   }
+   if (searched_record.file_type == FT_DIRECTORY) {
+      printk("can`t delete a direcotry with unlink(), use rmdir() to instead\n");
+      dir_close(searched_record.parent_dir);
+      return -1;
+   }
