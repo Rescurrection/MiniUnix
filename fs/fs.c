@@ -535,3 +535,31 @@ int32_t sys_unlink(const char* pathname) {
    dir_close(searched_record.parent_dir);
    return 0;   // 成功删除文件 
 }
+
+/* 创建目录pathname,成功返回0,失败返回-1 */
+int32_t sys_mkdir(const char* pathname) {
+   uint8_t rollback_step = 0;	       // 用于操作失败时回滚各资源状态
+   void* io_buf = sys_malloc(SECTOR_SIZE * 2);
+   if (io_buf == NULL) {
+      printk("sys_mkdir: sys_malloc for io_buf failed\n");
+      return -1;
+   }
+
+   struct path_search_record searched_record;
+   memset(&searched_record, 0, sizeof(struct path_search_record));
+   int inode_no = -1;
+   inode_no = search_file(pathname, &searched_record);
+   if (inode_no != -1) {      // 如果找到了同名目录或文件,失败返回
+      printk("sys_mkdir: file or directory %s exist!\n", pathname);
+      rollback_step = 1;
+      goto rollback;
+   } else {	     // 若未找到,也要判断是在最终目录没找到还是某个中间目录不存在
+      uint32_t pathname_depth = path_depth_cnt((char*)pathname);
+      uint32_t path_searched_depth = path_depth_cnt(searched_record.searched_path);
+      /* 先判断是否把pathname的各层目录都访问到了,即是否在某个中间目录就失败了 */
+      if (pathname_depth != path_searched_depth) {   // 说明并没有访问到全部的路径,某个中间目录是不存在的
+	 printk("sys_mkdir: can`t access %s, subpath %s is`t exist\n", pathname, searched_record.searched_path);
+	 rollback_step = 1;
+	 goto rollback;
+      }
+   }
