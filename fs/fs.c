@@ -504,3 +504,18 @@ int32_t sys_unlink(const char* pathname) {
       dir_close(searched_record.parent_dir);
       return -1;
    }
+
+  /* 检查是否在已打开文件列表(文件表)中 */
+   uint32_t file_idx = 0;
+   while (file_idx < MAX_FILE_OPEN) {
+      if (file_table[file_idx].fd_inode != NULL && (uint32_t)inode_no == file_table[file_idx].fd_inode->i_no) {
+	 break;
+      }
+      file_idx++;
+   }
+   if (file_idx < MAX_FILE_OPEN) {
+      dir_close(searched_record.parent_dir);
+      printk("file %s is in use, not allow to delete!\n", pathname);
+      return -1;
+   }
+   ASSERT(file_idx == MAX_FILE_OPEN);
