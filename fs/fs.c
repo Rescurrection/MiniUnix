@@ -519,3 +519,19 @@ int32_t sys_unlink(const char* pathname) {
       return -1;
    }
    ASSERT(file_idx == MAX_FILE_OPEN);
+
+  /* 为delete_dir_entry申请缓冲区 */
+   void* io_buf = sys_malloc(SECTOR_SIZE + SECTOR_SIZE);
+   if (io_buf == NULL) {
+      dir_close(searched_record.parent_dir);
+      printk("sys_unlink: malloc for io_buf failed\n");
+      return -1;
+   }
+
+   struct dir* parent_dir = searched_record.parent_dir;  
+   delete_dir_entry(cur_part, parent_dir, inode_no, io_buf);
+   inode_release(cur_part, inode_no);
+   sys_free(io_buf);
+   dir_close(searched_record.parent_dir);
+   return 0;   // 成功删除文件 
+}
