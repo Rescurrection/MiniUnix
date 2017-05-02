@@ -563,3 +563,19 @@ int32_t sys_mkdir(const char* pathname) {
 	 goto rollback;
       }
    }
+ struct dir* parent_dir = searched_record.parent_dir;
+   /* 目录名称后可能会有字符'/',所以最好直接用searched_record.searched_path,无'/' */
+   char* dirname = strrchr(searched_record.searched_path, '/') + 1;
+
+   inode_no = inode_bitmap_alloc(cur_part); 
+   if (inode_no == -1) {
+      printk("sys_mkdir: allocate inode failed\n");
+      rollback_step = 1;
+      goto rollback;
+   }
+
+   struct inode new_dir_inode;
+   inode_init(inode_no, &new_dir_inode);	    // 初始化i结点
+
+   uint32_t block_bitmap_idx = 0;     // 用来记录block对应于block_bitmap中的索引
+   int32_t block_lba = -1;
