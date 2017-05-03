@@ -579,3 +579,62 @@ int32_t sys_mkdir(const char* pathname) {
 
    uint32_t block_bitmap_idx = 0;     // 用来记录block对应于block_bitmap中的索引
    int32_t block_lba = -1;
+
+	/* 为目录分配一个块,用来写入目录.和.. */
+   block_lba = block_bitmap_alloc(cur_part);
+   if (block_lba == -1) {
+      printk("sys_mkdir: block_bitmap_alloc for create directory failed\n");
+      rollback_step = 2;
+      goto rollback;
+   }
+   new_dir_inode.i_sectors[0] = block_lba;
+   /* 每分配一个块就将位图同步到硬盘 */
+   block_bitmap_idx = block_lba - cur_part->sb->data_start_lba;
+   ASSERT(block_bitmap_idx != 0);
+   bitmap_sync(cur_part, block_bitmap_idx, BLOCK_BITMAP);
+   
+   /* 将当前目录的目录项'.'和'..'写入目录 */
+   memset(io_buf, 0, SECTOR_SIZE * 2);	 // 清空io_buf
+   struct dir_entry* p_de = (struct dir_entry*)io_buf;
+   
+   /* 初始化当前目录"." */
+   memcpy(p_de->filename, ".", 1);
+   p_de->i_no = inode_no ;
+   p_de->f_type = FT_DIRECTORY;
+
+   p_de++;
+   /* 初始化当前目录".." */
+   memcpy(p_de->filename, "..", 2);
+   p_de->i_no = parent_dir->inode->i_no;
+   p_de->f_type = FT_DIRECTORY;
+   ide_write(cur_part->my_disk, new_dir_inode.i_sectors[0], io_buf, 1);
+
+   new_dir_inode.i_size = 2 * cur_part->sb->dir_entry_size;
+
+   /* 在父目录中添加自己的目录项 */
+   struct dir_entry new_dir_entry;
+   memset(&new_dir_entry, 0, sizeof(struct dir_entry));
+   create_dir_entry(dirname, inode_no, FT_DIRECTORY, &new_dir_entry);
+   memset(io_buf, 0, SECTOR_SIZE * 2);	 // 清空io_buf
+   if (!sync_dir_entry(parent_dir, &new_dir_entry, io_buf)) {	  // sync_dir_entry中将block_bitmap通过bitmap_sync同步到硬盘
+      printk("sys_mkdir: sync_dir_entry to disk failed!\n");
+      rollback_step = 2;
+      goto rollback;
+   }
+
+   /* 父目录的inode同步到硬盘 */
+   memset(io_buf, 0, SECTOR_SIZE * 2);
+   inode_sync(cur_part, parent_dir->inode, io_buf);
+
+   /* 将新创建目录的inode同步到硬盘 */
+   memset(io_buf, 0, SECTOR_SIZE * 2);
+   inode_sync(cur_part, &new_dir_inode, io_buf);
+
+   /* 将inode位图同步到硬盘 */
+   bitmap_sync(cur_part, inode_no, INODE_BITMAP);
+
+   sys_free(io_buf);
+
+   /* 关闭所创建目录的父目录 */
+   dir_close(searched_record.parent_dir);
+   return 0;
