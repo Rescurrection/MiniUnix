@@ -638,3 +638,16 @@ int32_t sys_mkdir(const char* pathname) {
    /* 关闭所创建目录的父目录 */
    dir_close(searched_record.parent_dir);
    return 0;
+/*创建文件或目录需要创建相关的多个资源,若某步失败则会执行到下面的回滚步骤 */
+rollback:	     // 因为某步骤操作失败而回滚
+   switch (rollback_step) {
+      case 2:
+	 bitmap_set(&cur_part->inode_bitmap, inode_no, 0);	 // 如果新文件的inode创建失败,之前位图中分配的inode_no也要恢复 
+      case 1:
+	 /* 关闭所创建目录的父目录 */
+	 dir_close(searched_record.parent_dir);
+	 break;
+   }
+   sys_free(io_buf);
+   return -1;
+}
