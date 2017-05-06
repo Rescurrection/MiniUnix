@@ -677,3 +677,13 @@ struct dir* sys_opendir(const char* name) {
    dir_close(searched_record.parent_dir);
    return ret;
 }
+
+/* 成功关闭目录dir返回0,失败返回-1 */
+int32_t sys_closedir(struct dir* dir) {
+   int32_t ret = -1;
+   if (dir != NULL) {
+      dir_close(dir);
+      ret = 0;
+   }
+   return ret;
+}
