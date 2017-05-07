@@ -692,3 +692,8 @@ struct dir_entry* sys_readdir(struct dir* dir) {
    ASSERT(dir != NULL);
    return dir_read(dir);
 }
+
+/* 把目录dir的指针dir_pos置0 */
+void sys_rewinddir(struct dir* dir) {
+   dir->dir_pos = 0;
+}
