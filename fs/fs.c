@@ -687,3 +687,8 @@ int32_t sys_closedir(struct dir* dir) {
    }
    return ret;
 }
+/* 读取目录dir的1个目录项,成功后返回其目录项地址,到目录尾时或出错时返回NULL */
+struct dir_entry* sys_readdir(struct dir* dir) {
+   ASSERT(dir != NULL);
+   return dir_read(dir);
+}
