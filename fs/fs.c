@@ -726,3 +726,17 @@ int32_t sys_rmdir(const char* pathname) {
    dir_close(searched_record.parent_dir);
    return retval;
 }
+
+/* 获得父目录的inode编号 */
+static uint32_t get_parent_dir_inode_nr(uint32_t child_inode_nr, void* io_buf) {
+   struct inode* child_dir_inode = inode_open(cur_part, child_inode_nr);
+   /* 目录中的目录项".."中包括父目录inode编号,".."位于目录的第0块 */
+   uint32_t block_lba = child_dir_inode->i_sectors[0];
+   ASSERT(block_lba >= cur_part->sb->data_start_lba);
+   inode_close(child_dir_inode);
+   ide_read(cur_part->my_disk, block_lba, io_buf, 1);   
+   struct dir_entry* dir_e = (struct dir_entry*)io_buf;
+   /* 第0个目录项是".",第1个目录项是".." */
+   ASSERT(dir_e[1].i_no < 4096 && dir_e[1].f_type == FT_DIRECTORY);
+   return dir_e[1].i_no;      // 返回..即父目录的inode编号
+}
