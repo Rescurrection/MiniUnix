@@ -804,3 +804,19 @@ char* sys_getcwd(char* buf, uint32_t size) {
       sys_free(io_buf);
       return buf;
    }
+
+   memset(buf, 0, size);
+   char full_path_reverse[MAX_PATH_LEN] = {0};	  // 用来做全路径缓冲区
+
+   /* 从下往上逐层找父目录,直到找到根目录为止.
+    * 当child_inode_nr为根目录的inode编号(0)时停止,
+    * 即已经查看完根目录中的目录项 */
+   while ((child_inode_nr)) {
+      parent_inode_nr = get_parent_dir_inode_nr(child_inode_nr, io_buf);
+      if (get_child_dir_name(parent_inode_nr, child_inode_nr, full_path_reverse, io_buf) == -1) {	  // 或未找到名字,失败退出
+	 sys_free(io_buf);
+	 return NULL;
+      }
+      child_inode_nr = parent_inode_nr;
+   }
+   ASSERT(strlen(full_path_reverse) <= size);
