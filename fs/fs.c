@@ -782,4 +782,25 @@ static int get_child_dir_name(uint32_t p_inode_nr, uint32_t c_inode_nr, char* pa
    return -1;
 }
 
-
+/* 把当前工作目录绝对路径写入buf, size是buf的大小. 
+ 当buf为NULL时,由操作系统分配存储工作路径的空间并返回地址
+ 失败则返回NULL */
+char* sys_getcwd(char* buf, uint32_t size) {
+   /* 确保buf不为空,若用户进程提供的buf为NULL,
+   系统调用getcwd中要为用户进程通过malloc分配内存 */
+   ASSERT(buf != NULL);
+   void* io_buf = sys_malloc(SECTOR_SIZE);
+   if (io_buf == NULL) {
+      return NULL;
+   }
+   struct task_struct* cur_thread = running_thread();
+   int32_t parent_inode_nr = 0;
+   int32_t child_inode_nr = cur_thread->cwd_inode_nr;
+   ASSERT(child_inode_nr >= 0 && child_inode_nr < 4096);      // 最大支持4096个inode
+   /* 若当前目录是根目录,直接返回'/' */
+   if (child_inode_nr == 0) {
+      buf[0] = '/';
+      buf[1] = 0;
+      sys_free(io_buf);
+      return buf;
+   }
