@@ -34,3 +34,23 @@ int32_t sys_pipe(int32_t pipefd[2]) {
    pipefd[1] = pcb_fd_install(global_fd);
    return 0;
 }
+
+/* 从管道中读数据 */
+uint32_t pipe_read(int32_t fd, void* buf, uint32_t count) {
+   char* buffer = buf;
+   uint32_t bytes_read = 0;
+   uint32_t global_fd = fd_local2global(fd);
+
+   /* 获取管道的环形缓冲区 */
+   struct ioqueue* ioq = (struct ioqueue*)file_table[global_fd].fd_inode;
+
+   /* 选择较小的数据读取量,避免阻塞 */
+   uint32_t ioq_len = ioq_length(ioq);
+   uint32_t size = ioq_len > count ? count : ioq_len;
+   while (bytes_read < size) {
+      *buffer = ioq_getchar(ioq);
+      bytes_read++;
+      buffer++;
+   }
+   return bytes_read;
+}
