@@ -55,43 +55,4 @@ uint32_t pipe_read(int32_t fd, void* buf, uint32_t count) {
    return bytes_read;
 }
 
-/* 分析字符串cmd_str中以token为分隔符的单词,将各单词的指针存入argv数组 */
-static int32_t cmd_parse(char* cmd_str, char** argv, char token) {
-   assert(cmd_str != NULL);
-   int32_t arg_idx = 0;
-   while(arg_idx < MAX_ARG_NR) {
-      argv[arg_idx] = NULL;
-      arg_idx++;
-   }
-   char* next = cmd_str;
-   int32_t argc = 0;
-   /* 外层循环处理整个命令行 */
-   while(*next) {
-      /* 去除命令字或参数之间的空格 */
-      while(*next == token) {
-	 next++;
-      }
-      /* 处理最后一个参数后接空格的情况,如"ls dir2 " */
-      if (*next == 0) {
-	 break; 
-      }
-      argv[argc] = next;
 
-     /* 内层循环处理命令行中的每个命令字及参数 */
-      while (*next && *next != token) {	  // 在字符串结束前找单词分隔符
-	 next++;
-      }
-
-      /* 如果未结束(是token字符),使tocken变成0 */
-      if (*next) {
-	 *next++ = 0;	// 将token字符替换为字符串结束符0,做为一个单词的结束,并将字符指针next指向下一个字符
-      }
-   
-      /* 避免argv数组访问越界,参数过多则返回0 */
-      if (argc > MAX_ARG_NR) {
-	 return -1;
-      }
-      argc++;
-   }
-   return argc;
-}
