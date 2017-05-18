@@ -55,4 +55,21 @@ uint32_t pipe_read(int32_t fd, void* buf, uint32_t count) {
    return bytes_read;
 }
 
+/* 往管道中写数据 */
+uint32_t pipe_write(int32_t fd, const void* buf, uint32_t count) {
+   uint32_t bytes_write = 0;
+   uint32_t global_fd = fd_local2global(fd);
+   struct ioqueue* ioq = (struct ioqueue*)file_table[global_fd].fd_inode;
 
+   /* 选择较小的数据写入量,避免阻塞 */
+   uint32_t ioq_left = bufsize - ioq_length(ioq);
+   uint32_t size = ioq_left > count ? count : ioq_left;
+
+   const char* buffer = buf;
+   while (bytes_write < size) {
+      ioq_putchar(ioq, *buffer);
+      bytes_write++;
+      buffer++;
+   }
+   return bytes_write;
+}
