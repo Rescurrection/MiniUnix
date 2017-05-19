@@ -820,3 +820,16 @@ char* sys_getcwd(char* buf, uint32_t size) {
       child_inode_nr = parent_inode_nr;
    }
    ASSERT(strlen(full_path_reverse) <= size);
+/* 至此full_path_reverse中的路径是反着的,
+ * 即子目录在前(左),父目录在后(右) ,
+ * 现将full_path_reverse中的路径反置 */
+   char* last_slash;	// 用于记录字符串中最后一个斜杠地址
+   while ((last_slash = strrchr(full_path_reverse, '/'))) {
+      uint16_t len = strlen(buf);
+      strcpy(buf + len, last_slash);
+      /* 在full_path_reverse中添加结束字符,做为下一次执行strcpy中last_slash的边界 */
+      *last_slash = 0;
+   }
+   sys_free(io_buf);
+   return buf;
+}
