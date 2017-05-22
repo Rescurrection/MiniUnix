@@ -927,3 +927,18 @@ void filesys_init() {
       channel_no++;	// 下一通道
    }
    sys_free(sb_buf);
+
+   /* 确定默认操作的分区 */
+   char default_part[8] = "sdb1";
+   /* 挂载分区 */
+   list_traversal(&partition_list, mount_partition, (int)default_part);
+
+   /* 将当前分区的根目录打开 */
+   open_root_dir(cur_part);
+
+   /* 初始化文件表 */
+   uint32_t fd_idx = 0;
+   while (fd_idx < MAX_FILE_OPEN) {
+      file_table[fd_idx++].fd_inode = NULL;
+   }
+}
