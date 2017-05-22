@@ -901,3 +901,29 @@ void filesys_init() {
 	       part = hd->logic_parts;
 	    }
 	 
+/* channels数组是全局变量,默认值为0,disk属于其嵌套结构,
+	  * partition又为disk的嵌套结构,因此partition中的成员默认也为0.
+	  * 若partition未初始化,则partition中的成员仍为0. 
+	  * 下面处理存在的分区. */
+	    if (part->sec_cnt != 0) {  // 如果分区存在
+	       memset(sb_buf, 0, SECTOR_SIZE);
+
+	       /* 读出分区的超级块,根据魔数是否正确来判断是否存在文件系统 */
+	       ide_read(hd, part->start_lba + 1, sb_buf, 1);   
+
+	       /* 只支持自己的文件系统.若磁盘上已经有文件系统就不再格式化了 */
+	       if (sb_buf->magic == 0x19590318) {
+		  printk("%s has filesystem\n", part->name);
+	       } else {			  // 其它文件系统不支持,一律按无文件系统处理
+		  printk("formatting %s`s partition %s......\n", hd->name, part->name);
+		  partition_format(part);
+	       }
+	    }
+	    part_idx++;
+	    part++;	// 下一分区
+	 }
+	 dev_no++;	// 下一磁盘
+      }
+      channel_no++;	// 下一通道
+   }
+   sys_free(sb_buf);
