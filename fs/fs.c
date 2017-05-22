@@ -852,3 +852,10 @@ int32_t sys_chdir(const char* path) {
    return ret;
 }
 
+
+/* 向屏幕输出一个字符 */
+void sys_putchar(char char_asci) {
+   console_put_char(char_asci);
+}
+
+
