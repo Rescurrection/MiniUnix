@@ -874,3 +874,30 @@ void sys_help(void) {
        ctrl+l: clear screen\n\
        ctrl+u: clear input\n\n");
 }
+
+
+/* 在磁盘上搜索文件系统,若没有则格式化分区创建文件系统 */
+void filesys_init() {
+   uint8_t channel_no = 0, dev_no, part_idx = 0;
+
+   /* sb_buf用来存储从硬盘上读入的超级块 */
+   struct super_block* sb_buf = (struct super_block*)sys_malloc(SECTOR_SIZE);
+
+   if (sb_buf == NULL) {
+      PANIC("alloc memory failed!");
+   }
+   printk("searching filesystem......\n");
+   while (channel_no < channel_cnt) {
+      dev_no = 0;
+      while(dev_no < 2) {
+	 if (dev_no == 0) {   // 跨过裸盘hd60M.img
+	    dev_no++;
+	    continue;
+	 }
+	 struct disk* hd = &channels[channel_no].devices[dev_no];
+	 struct partition* part = hd->prim_parts;
+	 while(part_idx < 12) {   // 4个主分区+8个逻辑
+	    if (part_idx == 4) {  // 开始处理逻辑分区
+	       part = hd->logic_parts;
+	    }
+	 
