@@ -66,3 +66,10 @@ struct partition_table_entry {
    uint32_t start_lba;		 // 本分区起始扇区的lba地址
    uint32_t sec_cnt;		 // 本分区的扇区数目
 } __attribute__ ((packed));	 // 保证此结构是16字节大小
+
+/* 引导扇区,mbr或ebr所在的扇区 */
+struct boot_sector {
+   uint8_t  other[446];		 // 引导代码
+   struct   partition_table_entry partition_table[4];       // 分区表中有4项,共64字节
+   uint16_t signature;		 // 启动扇区的结束标志是0x55,0xaa,
+} __attribute__ ((packed));
