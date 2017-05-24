@@ -73,3 +73,13 @@ struct boot_sector {
    struct   partition_table_entry partition_table[4];       // 分区表中有4项,共64字节
    uint16_t signature;		 // 启动扇区的结束标志是0x55,0xaa,
 } __attribute__ ((packed));
+
+
+/* 选择读写的硬盘 */
+static void select_disk(struct disk* hd) {
+   uint8_t reg_device = BIT_DEV_MBS | BIT_DEV_LBA;
+   if (hd->dev_no == 1) {	// 若是从盘就置DEV位为1
+      reg_device |= BIT_DEV_DEV;
+   }
+   outb(reg_dev(hd->my_channel), reg_device);
+}
