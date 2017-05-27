@@ -132,3 +132,17 @@ static void write2sector(struct disk* hd, void* buf, uint8_t sec_cnt) {
    }
    outsw(reg_data(hd->my_channel), buf, size_in_byte / 2);
 }
+
+/* 等待30秒 */
+static bool busy_wait(struct disk* hd) {
+   struct ide_channel* channel = hd->my_channel;
+   uint16_t time_limit = 30 * 1000;	     // 可以等待30000毫秒
+   while (time_limit -= 10 >= 0) {
+      if (!(inb(reg_status(channel)) & BIT_STAT_BSY)) {
+	 return (inb(reg_status(channel)) & BIT_STAT_DRQ);
+      } else {
+	 mtime_sleep(10);		     // 睡眠10毫秒
+      }
+   }
+   return false;
+}
