@@ -83,3 +83,21 @@ static void select_disk(struct disk* hd) {
    }
    outb(reg_dev(hd->my_channel), reg_device);
 }
+
+/* 向硬盘控制器写入起始扇区地址及要读写的扇区数 */
+static void select_sector(struct disk* hd, uint32_t lba, uint8_t sec_cnt) {
+   ASSERT(lba <= max_lba);
+   struct ide_channel* channel = hd->my_channel;
+
+   /* 写入要读写的扇区数*/
+   outb(reg_sect_cnt(channel), sec_cnt);	 // 如果sec_cnt为0,则表示写入256个扇区
+
+   /* 写入lba地址(即扇区号) */
+   outb(reg_lba_l(channel), lba);		 // lba地址的低8位,不用单独取出低8位.outb函数中的汇编指令outb %b0, %w1会只用al。
+   outb(reg_lba_m(channel), lba >> 8);		 // lba地址的8~15位
+   outb(reg_lba_h(channel), lba >> 16);		 // lba地址的16~23位
+
+   /* 因为lba地址的24~27位要存储在device寄存器的0～3位,
+    * 无法单独写入这4位,所以在此处把device寄存器再重新写入一次*/
+   outb(reg_dev(channel), BIT_DEV_MBS | BIT_DEV_LBA | (hd->dev_no == 1 ? BIT_DEV_DEV : 0) | lba >> 24);
+}
