@@ -120,3 +120,15 @@ static void read_from_sector(struct disk* hd, void* buf, uint8_t sec_cnt) {
    }
    insw(reg_data(hd->my_channel), buf, size_in_byte / 2);
 }
+
+/* 将buf中sec_cnt扇区的数据写入硬盘 */
+static void write2sector(struct disk* hd, void* buf, uint8_t sec_cnt) {
+   uint32_t size_in_byte;
+   if (sec_cnt == 0) {
+   /* 因为sec_cnt是8位变量,由主调函数将其赋值时,若为256则会将最高位的1丢掉变为0 */
+      size_in_byte = 256 * 512;
+   } else { 
+      size_in_byte = sec_cnt * 512; 
+   }
+   outsw(reg_data(hd->my_channel), buf, size_in_byte / 2);
+}
