@@ -101,3 +101,10 @@ static void select_sector(struct disk* hd, uint32_t lba, uint8_t sec_cnt) {
     * 无法单独写入这4位,所以在此处把device寄存器再重新写入一次*/
    outb(reg_dev(channel), BIT_DEV_MBS | BIT_DEV_LBA | (hd->dev_no == 1 ? BIT_DEV_DEV : 0) | lba >> 24);
 }
+
+/* 向通道channel发命令cmd */
+static void cmd_out(struct ide_channel* channel, uint8_t cmd) {
+/* 只要向硬盘发出了命令便将此标记置为true,硬盘中断处理程序需要根据它来判断 */
+   channel->expecting_intr = true;
+   outb(reg_cmd(channel), cmd);
+}
