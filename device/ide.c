@@ -146,3 +146,9 @@ static bool busy_wait(struct disk* hd) {
    }
    return false;
 }
+
+/* 从硬盘读取sec_cnt个扇区到buf */
+void ide_read(struct disk* hd, uint32_t lba, void* buf, uint32_t sec_cnt) {   // 此处的sec_cnt为32位大小
+   ASSERT(lba <= max_lba);
+   ASSERT(sec_cnt > 0);
+   lock_acquire (&hd->my_channel->lock);
