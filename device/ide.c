@@ -233,3 +233,14 @@ void ide_write(struct disk* hd, uint32_t lba, void* buf, uint32_t sec_cnt) {
    /* 醒来后开始释放锁*/
    lock_release(&hd->my_channel->lock);
 }
+
+/* 将dst中len个相邻字节交换位置后存入buf */
+static void swap_pairs_bytes(const char* dst, char* buf, uint32_t len) {
+   uint8_t idx;
+   for (idx = 0; idx < len; idx += 2) {
+      /* buf中存储dst中两相邻元素交换位置后的字符串*/
+      buf[idx + 1] = *dst++;   
+      buf[idx]     = *dst++;   
+   }
+   buf[idx] = '\0';
+}
