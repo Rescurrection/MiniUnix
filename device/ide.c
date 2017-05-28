@@ -191,3 +191,9 @@ void ide_read(struct disk* hd, uint32_t lba, void* buf, uint32_t sec_cnt) {   //
    }
    lock_release(&hd->my_channel->lock);
 }
+
+/* 将buf中sec_cnt扇区数据写入硬盘 */
+void ide_write(struct disk* hd, uint32_t lba, void* buf, uint32_t sec_cnt) {
+   ASSERT(lba <= max_lba);
+   ASSERT(sec_cnt > 0);
+   lock_acquire (&hd->my_channel->lock);
