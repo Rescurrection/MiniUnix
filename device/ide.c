@@ -197,3 +197,39 @@ void ide_write(struct disk* hd, uint32_t lba, void* buf, uint32_t sec_cnt) {
    ASSERT(lba <= max_lba);
    ASSERT(sec_cnt > 0);
    lock_acquire (&hd->my_channel->lock);
+
+/* 1 先选择操作的硬盘 */
+   select_disk(hd);
+
+   uint32_t secs_op;		 // 每次操作的扇区数
+   uint32_t secs_done = 0;	 // 已完成的扇区数
+   while(secs_done < sec_cnt) {
+      if ((secs_done + 256) <= sec_cnt) {
+	 secs_op = 256;
+      } else {
+	 secs_op = sec_cnt - secs_done;
+      }
+
+   /* 2 写入待写入的扇区数和起始扇区号 */
+      select_sector(hd, lba + secs_done, secs_op);		      // 先将待读的块号lba地址和待读入的扇区数写入lba寄存器
+
+   /* 3 执行的命令写入reg_cmd寄存器 */
+      cmd_out(hd->my_channel, CMD_WRITE_SECTOR);	      // 准备开始写数据
+
+   /* 4 检测硬盘状态是否可读 */
+      if (!busy_wait(hd)) {			      // 若失败
+	 char error[64];
+	 sprintf(error, "%s write sector %d failed!!!!!!\n", hd->name, lba);
+	 PANIC(error);
+      }
+
+   /* 5 将数据写入硬盘 */
+      write2sector(hd, (void*)((uint32_t)buf + secs_done * 512), secs_op);
+
+      /* 在硬盘响应期间阻塞自己 */
+      sema_down(&hd->my_channel->disk_done);
+      secs_done += secs_op;
+   }
+   /* 醒来后开始释放锁*/
+   lock_release(&hd->my_channel->lock);
+}
