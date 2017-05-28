@@ -152,3 +152,42 @@ void ide_read(struct disk* hd, uint32_t lba, void* buf, uint32_t sec_cnt) {   //
    ASSERT(lba <= max_lba);
    ASSERT(sec_cnt > 0);
    lock_acquire (&hd->my_channel->lock);
+
+/* 1 先选择操作的硬盘 */
+   select_disk(hd);
+
+   uint32_t secs_op;		 // 每次操作的扇区数
+   uint32_t secs_done = 0;	 // 已完成的扇区数
+   while(secs_done < sec_cnt) {
+      if ((secs_done + 256) <= sec_cnt) {
+	 secs_op = 256;
+      } else {
+	 secs_op = sec_cnt - secs_done;
+      }
+
+   /* 2 写入待读入的扇区数和起始扇区号 */
+      select_sector(hd, lba + secs_done, secs_op);
+
+   /* 3 执行的命令写入reg_cmd寄存器 */
+      cmd_out(hd->my_channel, CMD_READ_SECTOR);	      // 准备开始读数据
+
+   /*********************   阻塞自己的时机  ***********************
+      在硬盘已经开始工作(开始在内部读数据或写数据)后才能阻塞自己,现在硬盘已经开始忙了,
+      将自己阻塞,等待硬盘完成读操作后通过中断处理程序唤醒自己*/
+      sema_down(&hd->my_channel->disk_done);
+   /*************************************************************/
+
+   /* 4 检测硬盘状态是否可读 */
+      /* 醒来后开始执行下面代码*/
+      if (!busy_wait(hd)) {			      // 若失败
+	 char error[64];
+	 sprintf(error, "%s read sector %d failed!!!!!!\n", hd->name, lba);
+	 PANIC(error);
+      }
+
+   /* 5 把数据从硬盘的缓冲区中读出 */
+      read_from_sector(hd, (void*)((uint32_t)buf + secs_done * 512), secs_op);
+      secs_done += secs_op;
+   }
+   lock_release(&hd->my_channel->lock);
+}
