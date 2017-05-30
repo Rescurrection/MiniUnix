@@ -376,3 +376,31 @@ void ide_init() {
 
       channel->expecting_intr = false;		   // 未向硬盘写入指令时不期待硬盘的中断
       lock_init(&channel->lock);		     
+   /* 初始化为0,目的是向硬盘控制器请求数据后,硬盘驱动sema_down此信号量会阻塞线程,
+   直到硬盘完成后通过发中断,由中断处理程序将此信号量sema_up,唤醒线程. */
+      sema_init(&channel->disk_done, 0);
+
+      register_handler(channel->irq_no, intr_hd_handler);
+
+      /* 分别获取两个硬盘的参数及分区信息 */
+      while (dev_no < 2) {
+	 struct disk* hd = &channel->devices[dev_no];
+	 hd->my_channel = channel;
+	 hd->dev_no = dev_no;
+	 sprintf(hd->name, "sd%c", 'a' + channel_no * 2 + dev_no);
+	 identify_disk(hd);	 // 获取硬盘参数
+	 if (dev_no != 0) {	 // 内核本身的裸硬盘(hd60M.img)不处理
+	    partition_scan(hd, 0);  // 扫描该硬盘上的分区  
+	 }
+	 p_no = 0, l_no = 0;
+	 dev_no++; 
+      }
+      dev_no = 0;			  	   // 将硬盘驱动器号置0,为下一个channel的两个硬盘初始化。
+      channel_no++;				   // 下一个channel
+   }
+
+   printk("\n   all partition info\n");
+   /* 打印所有分区信息 */
+   list_traversal(&partition_list, partition_info, (int)NULL);
+   printk("ide_init done\n");
+}
