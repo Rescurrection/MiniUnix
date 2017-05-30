@@ -317,3 +317,14 @@ static void partition_scan(struct disk* hd, uint32_t ext_lba) {
    }
    sys_free(bs);
 }
+
+
+/* 打印分区信息 */
+static bool partition_info(struct list_elem* pelem, int arg UNUSED) {
+   struct partition* part = elem2entry(struct partition, part_tag, pelem);
+   printk("   %s start_lba:0x%x, sec_cnt:0x%x\n",part->name, part->start_lba, part->sec_cnt);
+
+/* 在此处return false与函数本身功能无关,
+ * 只是为了让主调函数list_traversal继续向下遍历元素 */
+   return false;
+}
