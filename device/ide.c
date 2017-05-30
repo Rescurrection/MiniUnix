@@ -328,3 +328,21 @@ static bool partition_info(struct list_elem* pelem, int arg UNUSED) {
  * 只是为了让主调函数list_traversal继续向下遍历元素 */
    return false;
 }
+
+/* 硬盘中断处理程序 */
+void intr_hd_handler(uint8_t irq_no) {
+   ASSERT(irq_no == 0x2e || irq_no == 0x2f);
+   uint8_t ch_no = irq_no - 0x2e;
+   struct ide_channel* channel = &channels[ch_no];
+   ASSERT(channel->irq_no == irq_no);
+/* 不必担心此中断是否对应的是这一次的expecting_intr,
+ * 每次读写硬盘时会申请锁,从而保证了同步一致性 */
+   if (channel->expecting_intr) {
+      channel->expecting_intr = false;
+      sema_up(&channel->disk_done);
+
+/* 读取状态寄存器使硬盘控制器认为此次的中断已被处理,
+ * 从而硬盘可以继续执行新的读写 */
+      inb(reg_status(channel));
+   }
+}
